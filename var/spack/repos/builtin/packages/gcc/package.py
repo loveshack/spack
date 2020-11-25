@@ -98,6 +98,8 @@ class Gcc(AutotoolsPackage, GNUMirrorPackage):
     variant('bootstrap',
             default=False,
             description='add --enable-bootstrap flag for stage3 build')
+    variant('cc1specs', default='none',
+            description='Extra options to prepend to the cc1 default specs, e.g. -mcpu=...')
 
     depends_on('flex', type='build', when='@master')
 
@@ -592,7 +594,7 @@ class Gcc(AutotoolsPackage, GNUMirrorPackage):
 
     @property
     def spec_dir(self):
-        # e.g. lib/gcc/x86_64-unknown-linux-gnu/4.9.2/ligbcc.a
+        # e.g. lib/gcc/x86_64-unknown-linux-gnu/4.9.2
         gcc = self.spec['gcc'].command
         libgcc = gcc('-print-libgcc-file-name', output=str).strip()
         return os.path.dirname(libgcc) if libgcc else None
@@ -610,11 +612,14 @@ class Gcc(AutotoolsPackage, GNUMirrorPackage):
         lines = gcc('-dumpspecs', output=str).strip().split('\n')
         specs_file = join_path(self.spec_dir, 'specs')
         with open(specs_file, 'w') as out:
+            cc1specs = self.spec.variants['cc1specs'].value
             for line in lines:
                 out.write(line + '\n')
                 if line.startswith('*link:'):
                     out.write('-rpath {0}:{1} '.format(
                               self.prefix.lib, self.prefix.lib64))
+                if line.startswith('*cc1:') and cc1specs != 'none':
+                    out.write(cc1specs + ' ')
         set_install_permissions(specs_file)
 
     def setup_run_environment(self, env):
